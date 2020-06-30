@@ -1,6 +1,10 @@
 Class {
 	#name : #ArangoDBClient,
 	#superclass : #OpenApiClient,
+	#instVars : [
+		'database',
+		'collection'
+	],
 	#category : #'Arango-Core-Base'
 }
 
@@ -15699,6 +15703,14 @@ ArangoDBClient >> addEdgeDefinition: edgeDefinition graphName: graphName [
 		body: edgeDefinition.
 ]
 
+{ #category : #'api-cm' }
+ArangoDBClient >> baseUri [ 
+
+	^database isNil 
+		ifTrue: [ baseUri  ]
+		ifFalse:[baseUri clearPath; addPathSegments: {'_db'. database}]
+]
+
 { #category : #'as yet unclassified' }
 ArangoDBClient >> basicCreateCollection: aString [
 	^ self 
@@ -15803,14 +15815,51 @@ ArangoDBClient >> buildOpenApi [
 	^ OpenAPI readFrom: self class openApiSpec readStream 
 ]
 
+{ #category : #accessing }
+ArangoDBClient >> collection: anObject [
+	collection := anObject
+]
+
 { #category : #'as yet unclassified' }
 ArangoDBClient >> createCollection: aString [
 	self basicCreateCollection: aString
 ]
 
+{ #category : #'as yet unclassified' }
+ArangoDBClient >> createCollectionIfDoesntExist: aString [
+
+	[self basicCreateCollection: aString]
+		on: ArangoDuplicateNamed 
+		do: [ :ex | "ignore" ]
+]
+
+{ #category : #'api-cm' }
+ArangoDBClient >> createCursor: queryString [
+	"create cursor with default options"
+
+	| body |
+	
+	body := {('query' -> queryString).} asDictionary .
+
+	^ self operationWithId: 'CreateCursor' arguments: {} body: body.
+]
+
+{ #category : #creation }
+ArangoDBClient >> createDatabaseIfDoesntExist: aString [ 
+
+	[self createDatabaseNamed: aString]
+		on: ArangoDuplicateNamed 
+		do: [ :ex | "ignore" ]
+]
+
 { #category : #api }
 ArangoDBClient >> createDatabaseNamed: aString [ 
 	self basicCreateDatabase: aString
+]
+
+{ #category : #'as yet unclassified' }
+ArangoDBClient >> createDocument: anObject [
+	^ self createDocument: anObject collection: collection
 ]
 
 { #category : #'as yet unclassified' }
@@ -15897,6 +15946,16 @@ ArangoDBClient >> createGraphNamed: aString edgeDefinitions: aCollection [
 		edgeDefinitions: aCollection 
 ]
 
+{ #category : #'api-cm' }
+ArangoDBClient >> database: aString [ 
+	database := aString
+]
+
+{ #category : #'api-cm' }
+ArangoDBClient >> databaseFor: aName [ 
+	^ ArangoDatabase named: aName for: self
+]
+
 { #category : #'as yet unclassified' }
 ArangoDBClient >> ensureEdgeCollectionExists: createBlock ifAbsent: absentBlock [
 	[ createBlock value ]
@@ -15904,6 +15963,17 @@ ArangoDBClient >> ensureEdgeCollectionExists: createBlock ifAbsent: absentBlock 
 		do: [ :err |
 			absentBlock value.
 			createBlock value ]
+]
+
+{ #category : #'api-cm' }
+ArangoDBClient >> findById: id [
+	| body queryString |
+	
+	queryString := 'RETURN DOCUMENT("{1}")' format: {id}.
+
+	body := {('query' -> queryString).} asDictionary.
+
+	^ self operationWithId: 'CreateCursor' arguments: {} body: body.
 ]
 
 { #category : #'as yet unclassified' }
